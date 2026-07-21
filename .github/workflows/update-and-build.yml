@@ -2,7 +2,7 @@ name: Update flake and build cache
 on:
   push:
   schedule:
-    - cron: 0 */4 * * *
+    - cron: 0 */12 * * *
   workflow_dispatch:
 permissions:
   contents: write
@@ -38,11 +38,12 @@ jobs:
         with:
           name: thou-vow-linux
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cachixArgs: -m xz -l9
+          skipPush: true
 
       - name: Build cache
         run: |
-          nix run --inputs-from . nixpkgs#nix-fast-build -- \
+          cachix watch-exec -l19 thou-vow-linux -- \
+            nix run --inputs-from . nixpkgs#nix-fast-build -- \
             --no-nom --no-link --skip-cached --fail-fast --flake .#packages.x86_64-linux.default
 
       - name: Make commit
@@ -54,4 +55,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "chore(deps): bump flake to $(date +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase
           git push
