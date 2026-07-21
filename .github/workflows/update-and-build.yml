@@ -1,0 +1,77 @@
+name: Update flake and build cache
+on:
+  push:
+  schedule:
+    - cron: 0 */4 * * *
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: cache
+jobs:
+  update-and-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v35
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update flake
+        id: update
+        run: |
+          nix flake update
+
+          if git diff --quiet; then
+            echo "Unchanged flake"
+            echo "updated=false" >> $GITHUB_OUTPUT
+          else
+            echo "Flake updated!"
+            echo "updated=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check status
+        id: status
+        run: |
+          path=$(nix eval --raw .#linux_cachyos-lto-v3.outPath)
+          hash=$(basename "$path" | cut -d- -f1)
+          url="https://thou-vow-linux.cachix.org/$hash.narinfo"
+          status=$(curl -sI "$url" | grep -i '^cf-cache-status:' | cut -d' ' -f2 | tr -d '\r')
+
+          if [[ "$status" == "HIT" ]]; then
+            echo "$path hit cache!"
+            echo "missing=false" >> $GITHUB_OUTPUT
+          elif [[ "$status" == "MISS" ]]; then
+            echo "$path missing!"
+            echo "missing=true" >> $GITHUB_OUTPUT
+          else
+            echo "$path unexpected status: $status"
+            echo "missing=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure Cachix
+        uses: cachix/cachix-action@v17
+        if: steps.status.outputs.missing == 'true'
+        with:
+          name: thou-vow-linux
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build cache
+        if: steps.status.outputs.missing == 'true'
+        run: |
+          cachix watch-exec -m xz -l 9 thou-vow-linux -- \
+            nix build .#linux_cachyos-lto-v3 -L --no-link
+
+      - name: Make commit
+        if: steps.update.outputs.updated == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(deps): bump flake to $(date +%Y-%m-%dT%H:%MZ)"
+          git push
