@@ -42,7 +42,7 @@ jobs:
 
       - name: Build cache
         run: |
-          cachix watch-exec -l19 thou-vow-linux -- \
+          cachix watch-exec -l16 thou-vow-linux -- \
             nix run --inputs-from . nixpkgs#nix-fast-build -- \
             --no-nom --no-link --skip-cached --fail-fast --flake .#packages.x86_64-linux.default
 
