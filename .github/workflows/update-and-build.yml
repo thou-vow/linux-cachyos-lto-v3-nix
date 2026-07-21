@@ -33,37 +33,17 @@ jobs:
             echo "updated=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check status
-        id: status
-        run: |
-          path=$(nix eval --raw .#linux_cachyos-lto-v3.outPath)
-          hash=$(basename "$path" | cut -d- -f1)
-          url="https://thou-vow-linux.cachix.org/$hash.narinfo"
-          status=$(curl -sI "$url" | grep -i '^cf-cache-status:' | cut -d' ' -f2 | tr -d '\r')
-
-          if [[ "$status" == "HIT" ]]; then
-            echo "$path hit cache!"
-            echo "missing=false" >> $GITHUB_OUTPUT
-          elif [[ "$status" == "MISS" ]]; then
-            echo "$path missing!"
-            echo "missing=true" >> $GITHUB_OUTPUT
-          else
-            echo "$path unexpected status: $status"
-            echo "missing=unknown" >> $GITHUB_OUTPUT
-          fi
-
       - name: Configure Cachix
         uses: cachix/cachix-action@v17
-        if: steps.status.outputs.missing == 'true'
         with:
           name: thou-vow-linux
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          cachixArgs: -m xz -l9
 
       - name: Build cache
-        if: steps.status.outputs.missing == 'true'
         run: |
-          cachix watch-exec -m xz -l 9 thou-vow-linux -- \
-            nix build .#linux_cachyos-lto-v3 -L --no-link
+          nix run --inputs-from . nixpkgs#nix-fast-build -- \
+            --no-nom --skip-cached --fail-fast --flake .#packages.x86_64-linux.default
 
       - name: Make commit
         if: steps.update.outputs.updated == 'true'
