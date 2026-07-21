@@ -43,7 +43,7 @@ jobs:
       - name: Build cache
         run: |
           nix run --inputs-from . nixpkgs#nix-fast-build -- \
-            --no-nom --skip-cached --fail-fast --flake .#packages.x86_64-linux.default
+            --no-nom --no-link --skip-cached --fail-fast --flake .#packages.x86_64-linux.default
 
       - name: Make commit
         if: steps.update.outputs.updated == 'true'
