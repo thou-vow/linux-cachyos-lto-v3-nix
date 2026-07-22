@@ -2,7 +2,7 @@ name: Update flake and build cache
 on:
   push:
   schedule:
-    - cron: 0 */12 * * *
+    - cron: 0 */6 * * *
   workflow_dispatch:
 permissions:
   contents: write
@@ -33,16 +33,13 @@ jobs:
             echo "updated=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Configure Cachix
-        uses: cachix/cachix-action@v17
-        with:
-          name: thou-vow-linux
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          cachixArgs: -m zstd -l16
-
       - name: Build cache
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
-          nix build --no-link -L .
+          nix run --inputs-from . nixpkgs#cachix -- \
+            watch-exec -m zstd -l16 thou-vow-linux -- \
+            nix build --no-link -L .
 
       - name: Make commit
         if: steps.update.outputs.updated == 'true'
