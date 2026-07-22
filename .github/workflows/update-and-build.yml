@@ -38,13 +38,12 @@ jobs:
         with:
           name: thou-vow-linux
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          skipPush: true
+          cachixArgs: -m zstd -l16
 
       - name: Build cache
         run: |
-          cachix watch-exec -l16 thou-vow-linux -- \
-            nix run --inputs-from . nixpkgs#nix-fast-build -- \
-            --no-nom --no-link --skip-cached --fail-fast --flake .#packages.x86_64-linux.default
+          nix run --inputs-from . nixpkgs#nix-fast-build -- \
+            --no-nom --no-link --skip-cached --flake .#packages.x86_64-linux.default
 
       - name: Make commit
         if: steps.update.outputs.updated == 'true'
